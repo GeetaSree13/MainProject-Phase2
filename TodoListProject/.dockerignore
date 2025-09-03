@@ -1,0 +1,38 @@
+# Ignore Git files
+.git
+.gitignore
+
+# Ignore IDE files
+.idea/
+*.iml
+.vscode/
+.eclipse/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore Maven target directory (will be built inside container)
+target/
+
+# Ignore Maven wrapper jar (will be downloaded in container)
+.mvn/wrapper/maven-wrapper.jar
+
+# Ignore test files and documentation
+*.md
+README.md
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore node modules if any
+node_modules/
+
+# Ignore Docker files
+Dockerfile
+.dockerignore
