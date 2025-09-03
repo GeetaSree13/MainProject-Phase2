@@ -74,14 +74,17 @@ pipeline {
                 echo 'Building Docker image...'
                 dir('TodoListProject') {
                     script {
-                        // Build Docker image
-                        def dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                        // Build Docker image using shell commands
+                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
                         
                         // Also tag as latest
-                        dockerImage.tag("${DOCKER_IMAGE}:latest")
+                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                        
+                        // Verify image was created
+                        sh "docker images | grep ${DOCKER_IMAGE}"
                         
                         // Store image reference for later use
-                        env.DOCKER_IMAGE_ID = dockerImage.id
+                        env.DOCKER_IMAGE_ID = "${DOCKER_IMAGE}:${DOCKER_TAG}"
                     }
                 }
             }
@@ -110,10 +113,16 @@ pipeline {
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                    // Login to Docker Hub
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
+                        
                         // Push both versioned and latest tags
                         sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
                         sh "docker push ${DOCKER_IMAGE}:latest"
+                        
+                        // Logout for security
+                        sh "docker logout"
                     }
                 }
             }
