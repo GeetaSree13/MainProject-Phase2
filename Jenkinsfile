@@ -41,7 +41,7 @@ pipeline {
                 always {
                     dir('TodoListProject') {
                         // Publish test results
-                        junit testResultsPattern: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                        junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
                         
                         // Archive test reports
                         archiveArtifacts artifacts: 'target/surefire-reports/*.xml', allowEmptyArchive: true
