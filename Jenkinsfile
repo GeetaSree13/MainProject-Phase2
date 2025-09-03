@@ -6,11 +6,13 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKER_IMAGE = 'geetasree01/todolist-app'
         DOCKER_TAG = "${BUILD_NUMBER}"
+        // Add Docker to PATH
+        PATH = "/usr/local/bin:${env.PATH}"
     }
 
     tools {
         maven 'MAVEN3.9.11' // Configure Maven in Jenkins Global Tool Configuration
-        jdk 'JDK23'        // Configure JDK 17 in Jenkins Global Tool Configuration
+        jdk 'JDK-17'        // Configure JDK 17 in Jenkins Global Tool Configuration
     }
 
     stages {
