@@ -17,5 +17,29 @@ public class Todo {
     @JsonProperty("completed")
     private boolean completed;
 
+    // Explicit getter and setter methods to ensure compilation works
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getTodoName() {
+        return todoName;
+    }
+
+    public void setTodoName(String todoName) {
+        this.todoName = todoName;
+    }
+
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    public void setCompleted(boolean completed) {
+        this.completed = completed;
+    }
 }
 
