@@ -1,0 +1,113 @@
+---
+# Backend ConfigMap for application properties
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: todolist-app
+  labels:
+    app: todolist-backend
+data:
+  application.properties: |
+    spring.application.name=TodoListProject
+    server.port=8080
+    
+    # MongoDB Configuration
+    spring.data.mongodb.host=mongodb-service
+    spring.data.mongodb.port=27017
+    spring.data.mongodb.database=todoDb
+    
+    # Jackson Configuration
+    spring.jackson.default-property-inclusion=NON_NULL
+    
+    # Actuator Configuration for health checks
+    management.endpoints.web.exposure.include=health,info
+    management.endpoint.health.show-details=always
+    management.health.mongo.enabled=true
+
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todolist-backend
+  namespace: todolist-app
+  labels:
+    app: todolist-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: todolist-backend
+  template:
+    metadata:
+      labels:
+        app: todolist-backend
+    spec:
+      containers:
+        - name: todolist-backend
+          image: geetasree0103/todolist-backend:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_DATA_MONGODB_HOST
+              value: "mongodb-service"
+            - name: SPRING_DATA_MONGODB_PORT
+              value: "27017"
+            - name: SPRING_DATA_MONGODB_DATABASE
+              value: "todoDb"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+          volumeMounts:
+            - name: backend-config-volume
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+      volumes:
+        - name: backend-config-volume
+          configMap:
+            name: backend-config
+
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: todolist-backend-service
+  namespace: todolist-app
+  labels:
+    app: todolist-backend
+spec:
+  selector:
+    app: todolist-backend
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      name: http
+  type: ClusterIP

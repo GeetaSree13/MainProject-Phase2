@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: todolist-app
+  labels:
+    name: todolist-app
+    app: todolist
