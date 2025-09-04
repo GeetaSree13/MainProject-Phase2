@@ -7,7 +7,7 @@ const totalCount = document.getElementById('total-count');
 let completedTasks = 0;
 let totalTasks = 0;
 
-const API_BASE_URL = "/api/v1/todo";
+const API_BASE_URL = "http://localhost:9090/api/v1/todo";
 
 // Fetch existing tasks from the backend when the page loads
 document.addEventListener('DOMContentLoaded', () => {
