@@ -9,9 +9,7 @@ metadata:
     app: todolist
   annotations:
     # Nginx Ingress Controller annotations
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
@@ -29,23 +27,23 @@ spec:
     - host: todolist.local  # Change this to your domain
       http:
         paths:
-          # Frontend routes
-          - path: /()(.*)
-            pathType: Prefix
-            backend:
-              service:
-                name: todolist-frontend-service
-                port:
-                  number: 80
-          
-          # API routes
-          - path: /api/v1/todo(/|$)(.*)
+          # API routes (must come first - more specific)
+          - path: /api/v1/todo
             pathType: Prefix
             backend:
               service:
                 name: todolist-backend-service
                 port:
                   number: 8080
+          
+          # Frontend routes (catch-all)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: todolist-frontend-service
+                port:
+                  number: 80
 
 ---
 # Alternative Ingress for localhost/IP access (if needed)
@@ -57,31 +55,30 @@ metadata:
   labels:
     app: todolist
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
 
 spec:
   ingressClassName: nginx
   rules:
     - http:  # No host specified, matches any host/IP
         paths:
-          # Frontend routes
-          - path: /()(.*)
-            pathType: Prefix
-            backend:
-              service:
-                name: todolist-frontend-service
-                port:
-                  number: 80
-          
-          # API routes  
-          - path: /api/v1/todo(/|$)(.*)
+          # API routes (must come first - more specific)
+          - path: /api/v1/todo
             pathType: Prefix
             backend:
               service:
                 name: todolist-backend-service
                 port:
                   number: 8080
+          
+          # Frontend routes (catch-all)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: todolist-frontend-service
+                port:
+                  number: 80
