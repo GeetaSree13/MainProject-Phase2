@@ -105,23 +105,37 @@ pipeline {
             steps {
                 script {
                     echo "☸️ Deploying to Kubernetes cluster..."
-                    sh """
-                        # Update image tags in Kubernetes manifests
-                        sed -i '' 's|image: ${DOCKERHUB_USERNAME}/todolist-backend:.*|image: ${BACKEND_IMAGE}:${IMAGE_TAG}|g' k8s/backend-deployment.yaml
-                        sed -i '' 's|image: ${DOCKERHUB_USERNAME}/todolist-frontend:.*|image: ${FRONTEND_IMAGE}:${IMAGE_TAG}|g' k8s/frontend-deployment.yaml
-                        
-                        # Apply Kubernetes manifests
-                        kubectl apply -f k8s/namespace.yaml
-                        kubectl apply -f k8s/mongodb-deployment.yaml
-                        kubectl apply -f k8s/backend-deployment.yaml
-                        kubectl apply -f k8s/frontend-deployment.yaml
-                        kubectl apply -f k8s/ingress.yaml
-                        
-                        # Wait for deployments to be ready
-                        kubectl rollout status deployment/mongodb -n todolist-app --timeout=300s
-                        kubectl rollout status deployment/todolist-backend -n todolist-app --timeout=300s
-                        kubectl rollout status deployment/todolist-frontend -n todolist-app --timeout=300s
-                    """
+                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                        sh """
+                            # Set up kubectl with the kubeconfig
+                            export KUBECONFIG=\$KUBECONFIG
+                            
+                            # Update image tags in Kubernetes manifests
+                            sed -i '' 's|image: ${DOCKERHUB_USERNAME}/todolist-backend:.*|image: ${BACKEND_IMAGE}:${IMAGE_TAG}|g' k8s/backend-deployment.yaml
+                            sed -i '' 's|image: ${DOCKERHUB_USERNAME}/todolist-frontend:.*|image: ${FRONTEND_IMAGE}:${IMAGE_TAG}|g' k8s/frontend-deployment.yaml
+                            
+                            # Apply Kubernetes manifests in order
+                            kubectl apply -f k8s/namespace.yaml
+                            kubectl apply -f k8s/mongodb-deployment.yaml
+                            kubectl apply -f k8s/backend-deployment.yaml
+                            kubectl apply -f k8s/frontend-deployment.yaml
+                            kubectl apply -f k8s/ingress.yaml
+                            
+                            # Wait for deployments to be ready
+                            echo "⏳ Waiting for MongoDB to be ready..."
+                            kubectl rollout status deployment/mongodb -n todolist-app --timeout=300s
+                            
+                            echo "⏳ Waiting for Backend to be ready..."
+                            kubectl rollout status deployment/todolist-backend -n todolist-app --timeout=300s
+                            
+                            echo "⏳ Waiting for Frontend to be ready..."
+                            kubectl rollout status deployment/todolist-frontend -n todolist-app --timeout=300s
+                            
+                            # Get application access information
+                            echo "🌐 Application deployed successfully!"
+                            kubectl get ingress -n todolist-app
+                        """
+                    }
                 }
             }
         }
