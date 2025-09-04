@@ -1,205 +1,81 @@
 pipeline {
     agent any
-
+ 
+    tools {
+        maven 'MAVEN3.9.11'
+        jdk 'JDK23'
+    }
+ 
     environment {
-        // Docker Hub credentials (configure these in Jenkins)
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        DOCKER_IMAGE = 'geetasree01/todolist-app'
-        DOCKER_TAG = "${BUILD_NUMBER}"
-        // Add Docker to PATH
+        DOCKERHUB_REPO = "geetasree0103/todolist-app"
+        APP_VERSION = "v1.0.${BUILD_NUMBER}"
         PATH = "/usr/local/bin:${env.PATH}"
     }
-
-    tools {
-        maven 'MAVEN3.9.11' // Configure Maven in Jenkins Global Tool Configuration
-        jdk 'JDK23'        // Configure JDK 17 in Jenkins Global Tool Configuration
-    }
-
+ 
     stages {
-        stage('Checkout') {
+        stage('Checkout from GitHub') {
             steps {
-                echo 'Checking out source code...'
+                echo "Cloning GitHub repository..."
                 checkout scm
             }
         }
-
-        stage('Build Application') {
+ 
+        stage('Build with Maven') {
             steps {
-                echo 'Building the application with Maven...'
-                dir('TodoListProject') {
-                    sh 'mvn clean compile'
-                }
+                echo "Running Maven build..."
+                sh '''
+                    cd TodoListProject
+                    mvn clean install -DskipTests
+                '''
             }
         }
-
-        stage('Run Tests') {
-            steps {
-                echo 'Running unit tests...'
-                dir('TodoListProject') {
-                    sh 'mvn test'
-                }
-            }
-            post {
-                always {
-                    dir('TodoListProject') {
-                        // Publish test results
-                        junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
-                        
-                        // Archive test reports
-                        archiveArtifacts artifacts: 'target/surefire-reports/*.xml', allowEmptyArchive: true
-                    }
-                }
-            }
-        }
-
-        stage('Package Application') {
-            steps {
-                echo 'Packaging the application...'
-                dir('TodoListProject') {
-                    sh 'mvn package -DskipTests'
-                }
-            }
-            post {
-                success {
-                    dir('TodoListProject') {
-                        // Archive the built JAR file
-                        archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: false
-                    }
-                }
-            }
-        }
-
+ 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image...'
-                dir('TodoListProject') {
-                    script {
-                        // Build Docker image using shell commands
-                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                        
-                        // Also tag as latest
-                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
-                        
-                        // Verify image was created
-                        sh "docker images | grep ${DOCKER_IMAGE}"
-                        
-                        // Store image reference for later use
-                        env.DOCKER_IMAGE_ID = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-                    }
+                script {
+                    echo "Building Docker image from Dockerfile..."
+                    sh """
+                        cd TodoListProject
+                        docker build -t $DOCKERHUB_REPO:$APP_VERSION .
+                    """
                 }
             }
         }
-
-        stage('Docker Security Scan') {
+ 
+        stage('Login to DockerHub') {
             steps {
-                echo 'Scanning Docker image for vulnerabilities...'
                 script {
-                    try {
-                        // Optional: Add security scanning with tools like Trivy or Snyk
-                        sh """
-                            echo 'Security scan placeholder - configure with your preferred security tool'
-                            # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \\
-                            #   aquasec/trivy:latest image ${DOCKER_IMAGE}:${DOCKER_TAG}
-                        """
-                    } catch (Exception e) {
-                        echo "Security scan failed: ${e.getMessage()}"
-                        // Continue pipeline even if security scan fails
-                    }
+                    echo "Logging into Docker Hub..."
+                    sh """
+                        docker login -u $DOCKERHUB_CREDENTIALS_USR -p $DOCKERHUB_CREDENTIALS_PSW
+                    """
                 }
             }
         }
-
-        stage('Push to Docker Hub') {
+ 
+        stage('Push Docker Image to DockerHub') {
             steps {
-                echo 'Pushing Docker image to Docker Hub...'
                 script {
-                    // Login to Docker Hub
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
-                        
-                        // Push both versioned and latest tags
-                        sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                        sh "docker push ${DOCKER_IMAGE}:latest"
-                        
-                        // Logout for security
-                        sh "docker logout"
-                    }
-                }
-            }
-        }
-
-        stage('Clean Up') {
-            steps {
-                echo 'Cleaning up local Docker images...'
-                script {
-                    try {
-                        // Remove local images to save space
-                        sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true"
-                        sh "docker rmi ${DOCKER_IMAGE}:latest || true"
-                        
-                        // Clean up dangling images
-                        sh 'docker image prune -f'
-                    } catch (Exception e) {
-                        echo "Cleanup failed: ${e.getMessage()}"
-                    }
+                    echo "🚀 Pushing Docker image to DockerHub..."
+                    sh """
+                        docker push $DOCKERHUB_REPO:$APP_VERSION
+                        docker tag $DOCKERHUB_REPO:$APP_VERSION $DOCKERHUB_REPO:latest
+                        docker push $DOCKERHUB_REPO:latest
+                    """
                 }
             }
         }
     }
-
+ 
     post {
-        always {
-            echo 'Pipeline execution completed.'
-            
-            // Clean workspace
-            cleanWs()
-        }
-        
         success {
-            echo 'Pipeline executed successfully!'
-            
-            // Send notification (configure your notification method)
-            script {
-                def message = """
-                ✅ BUILD SUCCESS: TodoList Application
-                
-                📦 Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}
-                🔗 Docker Hub: https://hub.docker.com/r/${DOCKER_IMAGE.replace('/', '/r/')}/tags
-                🏗️ Build Number: ${BUILD_NUMBER}
-                ⏰ Build Duration: ${currentBuild.durationString}
-                """
-                
-                echo message
-                
-                // Uncomment and configure for your notification system:
-                // slackSend(channel: '#ci-cd', message: message)
-                // emailext(to: 'team@company.com', subject: 'Build Success', body: message)
-            }
+            echo "✅ Build, Docker image, and push completed successfully!"
+            echo "📦 Docker Image: $DOCKERHUB_REPO:$APP_VERSION"
+            echo "🏗️ Build Number: ${BUILD_NUMBER}"
         }
-        
         failure {
-            echo 'Pipeline failed!'
-            
-            // Send failure notification
-            script {
-                def message = """
-                ❌ BUILD FAILED: TodoList Application
-                
-                🏗️ Build Number: ${BUILD_NUMBER}
-                📋 Stage: ${env.STAGE_NAME}
-                🔗 Console: ${BUILD_URL}console
-                """
-                
-                echo message
-                
-                // Uncomment and configure for your notification system:
-                // slackSend(channel: '#ci-cd', message: message, color: 'danger')
-                // emailext(to: 'team@company.com', subject: 'Build Failed', body: message)
-            }
-        }
-        
-        unstable {
-            echo 'Pipeline is unstable.'
+            echo "❌ Pipeline failed. Check logs for errors."
         }
     }
 }
