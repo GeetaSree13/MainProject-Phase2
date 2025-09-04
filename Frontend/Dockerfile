@@ -18,8 +18,8 @@ COPY --from=builder /app /usr/share/nginx/html
 # Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Remove default nginx config
-RUN rm /etc/nginx/conf.d/default.conf.template
+# Remove default nginx config (if it exists)
+RUN rm -f /etc/nginx/conf.d/default.conf.template
 
 # Create nginx log directory
 RUN mkdir -p /var/log/nginx && \
